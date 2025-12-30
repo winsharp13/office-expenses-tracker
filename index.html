@@ -317,7 +317,7 @@ function filterByDate(selectedDate) {
 
     function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
 
-    function saveEntry(){
+    function saveEntry() {
   const type = document.getElementById('type').value;
   const amount = parseFloat(document.getElementById('amount').value);
   const date = document.getElementById('date').value;
@@ -334,29 +334,42 @@ function filterByDate(selectedDate) {
 
   const id = cryptoRandomId();
   const createdAt = new Date().toISOString();
-  const entry = { id, type, amount, date, source, note, category, method, refId, createdAt };
+
+  // Build entry object with keys matching your Google Sheet columns
+  const entry = {
+    date,
+    type,
+    amount,
+    source,
+    note,
+    category,
+    method,
+    refId,
+    id,
+    createdAt
+  };
 
   // Save locally
   entries.push(entry);
   persist();
-  renderEntries();
+  renderEntries(entries.slice(0, 10)); // show top 10
 
   // Auto-sync: send this single entry to Google Sheets
   const url = document.getElementById('syncUrl').value.trim(); // your Web App URL
-if (url){
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entries: [entry] }) // send as array
-  })
-  .then(res => res.json())
-  .then(data => console.log('Synced to Google Sheets:', data))
-  .catch(err => console.error('Sync failed:', err));
-}
-
+  if (url) {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry) // send flat object, not array
+    })
+    .then(res => res.text()) // Apps Script returns plain "Success"
+    .then(data => console.log('Synced to Google Sheets:', data))
+    .catch(err => console.error('Sync failed:', err));
+  }
 
   resetForm();
 }
+
 
 
     function resetForm(){
@@ -656,6 +669,7 @@ function applyDateFilter(){
   </script>
 </body>
 </html>
+
 
 
 
