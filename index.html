@@ -260,26 +260,59 @@ window.addEventListener("DOMContentLoaded", () => {
     // Default today's date
     const dateInput = document.getElementById('date');
     dateInput.valueAsDate = new Date();
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec"; // replace with your real Web App URL
 
-    async function loadEntries(){
-  const url = document.getElementById('syncUrl').value.trim();
-  if (url){
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      entries = data.entries || [];
-    } catch(err){
-      console.error('Could not load from Google Sheets, falling back to localStorage', err);
-      const raw = localStorage.getItem(STORAGE_KEY);
-      entries = raw ? JSON.parse(raw) : [];
+async function loadEntries() {
+  try {
+    const res = await fetch(WEB_APP_URL);
+    const data = await res.json();
+
+    if (Array.isArray(data)) {
+      entries = data.slice(1).map(row => ({
+        date: row[0],
+        type: row[1],
+        amount: row[2],
+        source: row[3],
+        note: row[4],
+        category: row[5],
+        method: row[6],
+        refId: row[7]
+      }));
+    } else if (data && Array.isArray(data.entries)) {
+      entries = data.entries;
+    } else {
+      entries = [];
     }
-  } else {
+  } catch (err) {
+    console.error('Could not load from Google Sheets, falling back to localStorage', err);
     const raw = localStorage.getItem(STORAGE_KEY);
     entries = raw ? JSON.parse(raw) : [];
   }
 
-renderEntries();
+  renderEntries(entries.slice(0, 10));
 }
+
+async function addEntry(entry) {
+  try {
+    await fetch(WEB_APP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)
+    });
+    await loadEntries();
+  } catch (err) {
+    console.error('Could not save to Google Sheets, saving locally', err);
+    entries.push(entry);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    renderEntries(entries.slice(0, 10));
+  }
+}
+
+function filterByDate(selectedDate) {
+  const filtered = entries.filter(e => e.date === selectedDate);
+  renderEntries(filtered);
+}
+
 
 
     function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
@@ -623,5 +656,6 @@ function applyDateFilter(){
   </script>
 </body>
 </html>
+
 
 
