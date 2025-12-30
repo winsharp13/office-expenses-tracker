@@ -184,7 +184,7 @@ body {
       </div>
       <div class="card-body">
         <label for="syncUrl">Google Sheets Sync URL</label>
-        <input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/AKfycby2sZr5CPtXOhwbtbal1GuWgdbgnzWPkV-UaBoD3ByLHYMqZCB68ucEMxT_d9EyTfc/exec" />
+        <input id="syncUrl" type="url" placeholder="Paste Apps Script Web App URL to sync entries" />
         <div class="inline-actions">
           <button class="btn btn-outline" onclick="syncAll()">Sync All Entries</button>
           <span class="muted small">Your Sheet: https://docs.google.com/spreadsheets/d/1c0MQkm7l5iuHiA1Q9Wz_V_OKk538lRQmvZYFI3NYqQ8/edit?gid=0</span>
@@ -253,7 +253,7 @@ body {
   });
 
   // Use your provided Web App URL (fallback if syncUrl input is empty)
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby2sZr5CPtXOhwbtbal1GuWgdbgnzWPkV-UaBoD3ByLHYMqZCB68ucEMxT_d9EyTfc/exec";
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec";
 
   async function loadEntries() {
     try {
@@ -289,21 +289,20 @@ body {
   }
 
   async function addEntry(entry) {
-  try {
-    await fetch(WEB_APP_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entry)   // flat object
-    });
-    await loadEntries();
-  } catch (err) {
-    console.error('Could not save to Google Sheets, saving locally', err);
-    entries.push(entry);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    renderEntries(entries.slice(-10));
+    try {
+      await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      await loadEntries();
+    } catch (err) {
+      console.error('Could not save to Google Sheets, saving locally', err);
+      entries.push(entry);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      renderEntries(entries.slice(-10));
+    }
   }
-}
-
 
   function filterByDate(selectedDate) {
     const filtered = entries.filter(e => e.date === selectedDate);
@@ -341,33 +340,38 @@ body {
     };
 
     // Local save and UI update
-    // Save locally
-entries.push(entry);
-persist();
-renderEntries(entries.slice(-10));
+    entries.push(entry);
+    persist();
+    renderEntries(entries.slice(-10)); // show latest 10 by default
 
-// Send to Google Sheets
-const url = document.getElementById('syncUrl')?.value.trim() || WEB_APP_URL;
-fetch(url, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    date: entry.date,
-    type: entry.type,
-    amount: entry.amount,
-    source: entry.source,
-    note: entry.note,
-    category: entry.category,
-    method: entry.method,
-    refId: entry.refId
-  })
-})
-.then(res => res.text())
-.then(data => console.log('Synced to Google Sheets:', data))
-.catch(err => console.error('Sync failed:', err));
+    // Auto-sync: post flat object (use syncUrl if provided, else WEB_APP_URL)
+    const urlFromInput = document.getElementById('syncUrl')?.value.trim();
+    const url = urlFromInput || WEB_APP_URL;
 
-resetForm();
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: entry.date,
+        type: entry.type,
+        amount: entry.amount,
+        source: entry.source,
+        note: entry.note,
+        category: entry.category,
+        method: entry.method,
+        refId: entry.refId
+      })
+    })
+    .then(res => res.text()) // Apps Script returns "Success"
+    .then(() => {
+      console.log('Appended to Google Sheets');
+      // Optional: refresh from sheet
+      // loadEntries();
+    })
+    .catch(err => console.error('Sync failed:', err));
 
+    resetForm();
+  }
 
   function resetForm(){
     document.getElementById('entryForm').reset();
@@ -672,5 +676,3 @@ resetForm();
   </script>
 </body>
 </html>
-
-
