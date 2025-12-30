@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vacha Consultancy - Office Expenses Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+  header .logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  margin-left: 12px; /* space between title and logo */
+}
+
+    :root{
+      --primary:#1f6feb; --primary-dark:#0f4ea6;
+      --bg:#f4f6f8; --text:#212529; --border:#d9dee5; --card:#ffffff;
+      --green:#177245; --red:#c62828;
+    }
+    *{box-sizing:border-box}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e9ecf1, #d0d7de); /* light gray to medium gray */
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: Inter, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+    header{
+      background:var(--card); border-bottom:1px solid var(--border);
+      padding:16px 24px; display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:10;
+    }
+    header h1{font-size:20px; margin:0; font-weight:600}
+    .container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;   /* narrower column */
+  margin: 24px auto;   /* gradient visible on sides */
+  padding: 0 16px;
+}
+
+    .card { background: rgba(255, 255, 255, 0.9); /* semi-transparent white */ border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.04); }
+    .card-header{padding:14px 16px; border-bottom:1px solid var(--border); font-weight:600;}
+    .card-body{padding:16px}
+    .footer-note{padding:12px 16px; font-size:12px; color:#5a6670; border-top:1px solid var(--border);}
+    .form-grid{display:grid; gap:12px; grid-template-columns: repeat(2, 1fr);}
+    .full{grid-column:1 / -1}
+    label{font-size:12px; font-weight:600; color:#59666f}
+    input, select, textarea{
+      width:100%; margin-top:6px; padding:10px 12px; border:1px solid var(--border);
+      border-radius:8px; background:#fff; font-size:14px;
+    }
+    textarea{min-height:80px; resize:vertical}
+    .actions{display:flex; gap:10px; margin-top:8px}
+    .btn{appearance:none; border:none; cursor:pointer; padding:10px 14px; border-radius:8px; font-weight:600; font-size:14px}
+    .btn-primary{background:var(--primary); color:#fff}
+    .btn-primary:hover{background:var(--primary-dark)}
+    .btn-outline{background:#fff; border:1px solid var(--border); color:#263238}
+    .btn-danger{background:#ef5350; color:#fff}
+    .sticky-total{position:sticky; top:88px}
+    .total-figure{display:flex; align-items:center; justify-content:space-between; font-size:20px; font-weight:700; padding:16px; border-bottom:1px solid var(--border);}
+    .meta-row{display:flex; gap:10px; padding:12px 16px; font-size:12px; color:#5a6670}
+    .meta-item{flex:1}
+    .download{border-top:1px solid var(--border); padding:12px 16px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap}
+    .chip{display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:#fafafa; color:#475569;}
+    table{width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden}
+    th, td{padding:12px; border-bottom:1px solid var(--border); text-align:left; font-size:14px; vertical-align:top}
+    thead th{background:#f8fafc; font-weight:600}
+    tbody tr:hover{background:#f9fbff}
+    .credit{color:var(--green); font-weight:600}
+    .debit{color:var(--red); font-weight:600}
+    .right{text-align:right} .nowrap{white-space:nowrap}
+    .muted{color:#60707a; font-size:12px}
+    .filters{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
+    .filters .group{min-width:200px}
+    .inline-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    .small{font-size:12px}
+    .important{color:#0f4ea6; font-weight:600}
+    /* PRINT: Only print the Entries Preview table card */
+    @media print{
+      body *{visibility:hidden}
+      #printArea, #printArea *{visibility:visible}
+      #printArea{position:absolute; left:0; top:0; width:100%}
+    }
+    @media (max-width: 960px){ .container{grid-template-columns: 1fr} .sticky-total{top:0} }
+  </style>
+</head>
+<body>
+  <header>
+  <h1>Vacha Consultancy - Office Expenses Tracker</h1>
+  <img src="D:\Vacha\Vacha Consultancy\HTML\Office expenses\vacha-logo.png" alt="Company Logo" class="logo">
+</header>
+
+  <div class="container">
+    <!-- Entry Form -->
+    <section class="card">
+      <div class="card-header">New Entry</div>
+      <div class="card-body">
+        <form id="entryForm" onsubmit="event.preventDefault(); saveEntry();">
+          <div class="form-grid">
+            <div>
+              <label for="type">Type</label>
+              <select id="type" required>
+                <option value="Credit">Credit</option>
+                <option value="Debit">Debit</option>
+              </select>
+            </div>
+            <div>
+              <label for="amount">Amount</label>
+              <input id="amount" type="number" step="0.01" min="0" placeholder="Enter amount" required />
+            </div>
+
+            <div>
+              <label for="date">Date</label>
+              <input id="date" type="date" required />
+            </div>
+            <div>
+              <label for="source">From (Firm/Person)</label>
+              <input id="source" type="text" placeholder="e.g., ABC Traders / Mahesh Patel" required />
+            </div>
+
+            <div class="full">
+              <label for="note">Expense Note</label>
+              <textarea id="note" placeholder="Purpose / details" required></textarea>
+            </div>
+
+            <!-- Optional helpful fields -->
+            <div>
+              <label for="category">Category</label>
+              <select id="category">
+                <option value="">Select</option>
+                <option>Office Expenses</option>
+                <option>Utilities</option>
+                <option>Travel</option>
+                <option>Maintenance</option>
+                <option>Salary</option>
+                <option>Miscellaneous</option>
+              </select>
+            </div>
+            <div>
+              <label for="method">Payment Method</label>
+              <select id="method">
+                <option>Cash</option>
+                <option>Bank Transfer</option>
+                <option>UPI</option>
+                <option>Card</option>
+              </select>
+            </div>
+
+            <div class="full">
+              <label for="refId">Reference ID (optional)</label>
+              <input id="refId" type="text" placeholder="Invoice/Txn/Ref number" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <button class="btn btn-outline" type="reset" onclick="resetForm()">Clear</button>
+          </div>
+        </form>
+      </div>
+      <div class="footer-note small">Tip: Date defaults to today but can be edited. Saved entries appear below automatically.</div>
+    </section>
+
+    <!-- Sticky Total Panel -->
+    <aside class="card sticky-total">
+      <div class="total-figure">
+        <span>Total Office Expenses</span>
+        <span id="totalAmount" class="nowrap">₹0.00</span>
+      </div>
+      <div class="card-body">
+        <div class="meta-row">
+          <div class="meta-item"><strong>Credits</strong><br/><span id="sumCredit">₹0.00</span></div>
+          <div class="meta-item"><strong>Debits</strong><br/><span id="sumDebit">₹0.00</span></div>
+        </div>
+      </div>
+      <div class="download">
+        <button class="btn btn-outline" onclick="downloadTemplate()">Download Entry Format (CSV)</button>
+        <button class="btn btn-outline" onclick="downloadExcel()">Download Excel (CSV)</button>
+        <button class="btn btn-outline" onclick="downloadPDF()">Download PDF (Table only)</button>
+      </div>
+      <div class="card-body">
+        <label for="syncUrl">Google Sheets Sync URL</label>
+        <input id="syncUrl" type="url" placeholder="Paste Apps Script Web App URL to sync entries" />
+        <div class="inline-actions">
+          <button class="btn btn-outline" onclick="syncAll()">Sync All Entries</button>
+          <span class="muted small">Your Sheet: https://docs.google.com/spreadsheets/d/1c0MQkm7l5iuHiA1Q9Wz_V_OKk538lRQmvZYFI3NYqQ8/edit?gid=0</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Entries Preview + Filters -->
+    <section class="card" id="printArea" style="grid-column: 1 / -1;">
+      <div class="card-header">Entries Preview</div>
+      <div class="card-body">
+        <div class="filters">
+          <div class="group">
+            <label for="fromDate">From date</label>
+            <input id="fromDate" type="date" />
+          </div>
+          <div class="group">
+            <label for="toDate">To date</label>
+            <input id="toDate" type="date" />
+          </div>
+          <div class="inline-actions">
+            <button class="btn btn-outline" onclick="applyDateFilter()">Apply Filter</button>
+            <button class="btn btn-outline" onclick="clearFilter()">Clear Filter</button>
+            <button class="btn btn-outline" onclick="downloadFilteredCSV()">Download Filtered Excel (CSV)</button>
+            <button class="btn btn-outline" onclick="downloadPDF()">Download Filtered PDF</button>
+          </div>
+        </div>
+
+        <div class="inline-actions" style="margin-top:12px">
+          <input id="importFile" type="file" accept=".csv" />
+          <button class="btn btn-outline" onclick="importCSV()">Import CSV → Add to entries</button>
+          <span class="muted small">Imported rows must match the “Entry Format” headers.</span>
+        </div>
+
+        <table id="entriesTable">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th class="right">Amount</th>
+              <th>Date</th>
+              <th>From</th>
+              <th>Note</th>
+              <th>Category</th>
+              <th>Method</th>
+              <th>Ref ID</th>
+              <th>Edit</th>
+            </tr>
+          </thead>
+          <tbody id="entriesBody"></tbody>
+        </table>
+      </div>
+      <div class="footer-note small">Color coding: Credit in green, Debit in red. Edit entries inline anytime.</div>
+    </section>
+  </div>
+
+  <script>
+  // Run when the page finishes loading
+window.addEventListener("DOMContentLoaded", () => {
+  const today = new Date().toISOString().split("T")[0];
+  const dateInput = document.getElementById("filterDate");
+  if (dateInput) {
+    dateInput.value = today;   // set filter to today
+  }
+  applyDateFilter();           // now shows only today’s entries
+});
+
+
+    // Persistent storage
+    const STORAGE_KEY = 'office_expenses_entries_v2';
+    let entries = [];
+    let currentFilter = { from: null, to: null };
+
+    // Default today's date
+    const dateInput = document.getElementById('date');
+    dateInput.valueAsDate = new Date();
+
+    async function loadEntries(){
+  const url = document.getElementById('syncUrl').value.trim();
+  if (url){
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      entries = data.entries || [];
+    } catch(err){
+      console.error('Could not load from Google Sheets, falling back to localStorage', err);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      entries = raw ? JSON.parse(raw) : [];
+    }
+  } else {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    entries = raw ? JSON.parse(raw) : [];
+  }
+
+renderEntries();
+}
+
+
+    function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+
+    function saveEntry(){
+  const type = document.getElementById('type').value;
+  const amount = parseFloat(document.getElementById('amount').value);
+  const date = document.getElementById('date').value;
+  const source = document.getElementById('source').value.trim();
+  const note = document.getElementById('note').value.trim();
+  const category = document.getElementById('category').value;
+  const method = document.getElementById('method').value;
+  const refId = document.getElementById('refId').value.trim();
+
+  if (!type || !amount || amount <= 0 || !date || !source || !note) {
+    alert('Please fill all required fields with valid values.');
+    return;
+  }
+
+  const id = cryptoRandomId();
+  const createdAt = new Date().toISOString();
+  const entry = { id, type, amount, date, source, note, category, method, refId, createdAt };
+
+  // Save locally
+  entries.push(entry);
+  persist();
+  renderEntries();
+
+  // Auto-sync: send this single entry to Google Sheets
+  const url = document.getElementById('syncUrl').value.trim(); // your Web App URL
+if (url){
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entries: [entry] }) // send as array
+  })
+  .then(res => res.json())
+  .then(data => console.log('Synced to Google Sheets:', data))
+  .catch(err => console.error('Sync failed:', err));
+}
+
+
+  resetForm();
+}
+
+
+    function resetForm(){
+      document.getElementById('entryForm').reset();
+      document.getElementById('type').value = 'Credit';
+      document.getElementById('date').valueAsDate = new Date();
+    }
+
+    // Editing (no time limit)
+    function startEdit(id){
+      const entry = entries.find(e => e.id === id);
+      if (!entry) return;
+
+      // Render editable cells inline
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      if (!row) return;
+
+      row.innerHTML = `
+        <td>
+          <select id="edit_type_${id}">
+            <option ${entry.type==='Credit'?'selected':''}>Credit</option>
+            <option ${entry.type==='Debit'?'selected':''}>Debit</option>
+          </select>
+        </td>
+        <td class="right">
+          <input id="edit_amount_${id}" type="number" step="0.01" min="0" value="${entry.amount}">
+        </td>
+        <td><input id="edit_date_${id}" type="date" value="${entry.date}"></td>
+        <td><input id="edit_source_${id}" type="text" value="${escapeAttr(entry.source)}"></td>
+        <td><textarea id="edit_note_${id}">${escapeAttr(entry.note)}</textarea></td>
+        <td>
+          <select id="edit_category_${id}">
+            ${categoryOptions(entry.category)}
+          </select>
+        </td>
+        <td>
+          <select id="edit_method_${id}">
+            ${methodOptions(entry.method)}
+          </select>
+        </td>
+        <td><input id="edit_refId_${id}" type="text" value="${escapeAttr(entry.refId||'')}"></td>
+        <td>
+          <button class="btn btn-primary" onclick="saveEdit('${id}')">Save</button>
+          <button class="btn btn-outline" onclick="cancelEdit('${id}')">Cancel</button>
+        </td>
+      `;
+    }
+
+    function saveEdit(id){
+      const idx = entries.findIndex(e => e.id === id);
+      if (idx === -1) return;
+
+      const type = document.getElementById(`edit_type_${id}`).value;
+      const amount = parseFloat(document.getElementById(`edit_amount_${id}`).value);
+      const date = document.getElementById(`edit_date_${id}`).value;
+      const source = document.getElementById(`edit_source_${id}`).value.trim();
+      const note = document.getElementById(`edit_note_${id}`).value.trim();
+      const category = document.getElementById(`edit_category_${id}`).value;
+      const method = document.getElementById(`edit_method_${id}`).value;
+      const refId = document.getElementById(`edit_refId_${id}`).value.trim();
+
+      if (!type || !amount || amount <= 0 || !date || !source || !note) {
+        alert('Please fill all required fields with valid values.');
+        return;
+      }
+
+      entries[idx] = { ...entries[idx], type, amount, date, source, note, category, method, refId };
+      persist();
+      renderEntries();
+    }
+
+    function cancelEdit(id){ renderEntries(); }
+
+    function categoryOptions(selected){
+      const cats = ["", "Office Expenses", "Utilities", "Travel", "Maintenance", "Salary", "Miscellaneous"];
+      return cats.map(c => `<option ${c===selected?'selected':''}>${c}</option>`).join('');
+    }
+    function methodOptions(selected){
+      const methods = ["Cash","Bank Transfer","UPI","Card"];
+      return methods.map(m => `<option ${m===selected?'selected':''}>${m}</option>`).join('');
+    }
+
+    // Date filtering
+function applyDateFilter(){
+  const from = document.getElementById('fromDate').value || null;
+  const to = document.getElementById('toDate').value || null;
+  currentFilter = { from, to };
+  renderEntries(); // will show ALL matches because filter is active
+}
+
+
+
+
+    function clearFilter(){
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  currentFilter = { from: null, to: null };
+  renderEntries(); // back to last 10
+}
+
+
+  function withinRange(dateStr){
+  if (!currentFilter.from && !currentFilter.to) return true;
+  const d = new Date(dateStr);
+  if (currentFilter.from && d < new Date(currentFilter.from)) return false;
+  if (currentFilter.to && d > new Date(currentFilter.to)) return false;
+  return true;
+}
+
+
+    // Render table + totals (based on filter)
+    function renderEntries(list = entries){
+  const tbody = document.getElementById('entriesBody');
+  tbody.innerHTML = '';
+
+  let sumCredit = 0, sumDebit = 0;
+
+  // Apply current filter
+  const filtered = list.filter(e => withinRange(e.date));
+
+  // Only limit to last 10 when NO filter is active
+  const isFilterActive = !!(currentFilter.from || currentFilter.to);
+  const toRender = isFilterActive ? filtered : filtered.slice(-10);
+
+  toRender.forEach(e => {
+    if (e.type === 'Credit') sumCredit += e.amount;
+    else sumDebit += e.amount;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', e.id);
+    const typeClass = e.type === 'Credit' ? 'credit' : 'debit';
+
+    tr.innerHTML = `
+      <td class="${typeClass}">${e.type}</td>
+      <td class="right ${typeClass}">₹${Number(e.amount).toFixed(2)}</td>
+      <td>${e.date}</td>
+      <td>${escapeHtml(e.source)}</td>
+      <td>${escapeHtml(e.note)}</td>
+      <td>${e.category ? `<span class="chip">${escapeHtml(e.category)}</span>` : ''}</td>
+      <td>${e.method ? `<span class="chip">${escapeHtml(e.method)}</span>` : ''}</td>
+      <td>${escapeHtml(e.refId || '')}</td>
+      <td><button class="btn btn-outline" onclick="startEdit('${e.id}')">Edit</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const netTotal = sumCredit - sumDebit;
+  document.getElementById('sumCredit').textContent = '₹' + sumCredit.toFixed(2);
+  document.getElementById('sumDebit').textContent = '₹' + sumDebit.toFixed(2);
+  document.getElementById('totalAmount').textContent = '₹' + netTotal.toFixed(2);
+}
+
+
+
+    // Print only Entries Preview (printArea)
+    function downloadPDF(){
+      window.print();
+    }
+
+    // Download Template CSV (required columns)
+    function downloadTemplate(){
+      const csv = [
+        'Type,Amount,Date,From,Note,Category,Method,RefID',
+        'Credit,1000,2025-11-01,ABC Traders,Advance received,Miscellaneous,Bank Transfer,ADV-001',
+        'Debit,250,2025-11-02,Stationery World,Pens and notebooks,Office Expenses,Cash,ST-783'
+      ].join('\n');
+      downloadBlob(csv, 'entry_format_template.csv', 'text/csv');
+    }
+
+    // Export all or filtered to CSV
+    function downloadExcel(){
+      const csv = buildCSV(entries);
+      downloadBlob(csv, 'office_expenses_all.csv', 'text/csv');
+    }
+    function downloadFilteredCSV(){
+      const filtered = entries.filter(e => withinRange(e.date));
+      const csv = buildCSV(filtered);
+      downloadBlob(csv, 'office_expenses_filtered.csv', 'text/csv');
+    }
+
+    function buildCSV(list){
+      let csv = 'Type,Amount,Date,From,Note,Category,Method,RefID\n';
+      list.forEach(e => {
+        const row = [
+          e.type,
+          Number(e.amount).toFixed(2),
+          e.date,
+          sanitizeCSV(e.source),
+          sanitizeCSV(e.note),
+          e.category || '',
+          e.method || '',
+          e.refId || ''
+        ].join(',');
+        csv += row + '\n';
+      });
+      return csv;
+    }
+
+    // Import CSV according to template
+    function importCSV(){
+      const fileInput = document.getElementById('importFile');
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) { alert('Please choose a CSV file to import.'); return; }
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        const rows = text.trim().split(/\r?\n/);
+        const header = rows.shift();
+        const expected = 'Type,Amount,Date,From,Note,Category,Method,RefID';
+        if (header.trim() !== expected){
+          alert('Invalid format. Please use the “Download Entry Format (CSV)” template.');
+          return;
+        }
+        let imported = 0;
+        rows.forEach(line => {
+          if (!line.trim()) return;
+          const cols = parseCSVLine(line);
+          const [type, amountStr, date, source, note, category, method, refId] = cols;
+          const amount = parseFloat(amountStr);
+          if (!type || !date || !source || !note || Number.isNaN(amount)) return;
+
+          entries.push({
+            id: cryptoRandomId(),
+            type: type === 'Debit' ? 'Debit' : 'Credit',
+            amount,
+            date,
+            source,
+            note,
+            category: category || '',
+            method: method || '',
+            refId: refId || '',
+            createdAt: new Date().toISOString()
+          });
+          imported++;
+        });
+        persist();
+        renderEntries();
+        alert(`Imported ${imported} entries.`);
+        fileInput.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    // Google Sheets Sync (requires webhook URL)
+    async function syncAll(){
+      const url = document.getElementById('syncUrl').value.trim();
+      if (!url){ alert('Please paste your Google Sheets Apps Script Web App URL.'); return; }
+
+      const payload = { entries };
+      try{
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json().catch(()=>({}));
+        alert('Sync completed successfully.');
+      }catch(err){
+        console.error(err);
+        alert('Sync failed. Please verify your Apps Script URL and permissions.');
+      }
+    }
+
+    // Helpers
+    function sanitizeCSV(s){ return String(s).replaceAll(',', ' '); }
+    function parseCSVLine(line){
+      // Simple CSV parser (no quoted commas). If you need full RFC parsing, replace this function.
+      return line.split(',').map(x => x.trim());
+    }
+    function downloadBlob(content, filename, mime){
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    function escapeHtml(str){
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+    }
+    function escapeAttr(str){
+      if (!str) return '';
+      return String(str).replace(/"/g,'&quot;');
+    }
+    function cryptoRandomId(){
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'id-' + Math.random().toString(36).slice(2) + Date.now();
+    }
+
+    // Init
+    loadEntries();
+
+  </script>
+</body>
+</html>
