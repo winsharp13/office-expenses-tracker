@@ -241,404 +241,438 @@ body {
   </div>
 
   <script>
-  // Run when the page finishes loading
-window.addEventListener("DOMContentLoaded", () => {
-  const today = new Date().toISOString().split("T")[0];
-  const dateInput = document.getElementById("filterDate");
-  if (dateInput) {
-    dateInput.value = today;   // set filter to today
-  }
-  applyDateFilter();           // now shows only today’s entries
-});
+  // Persistent storage
+  const STORAGE_KEY = 'office_expenses_entries_v2';
+  let entries = [];
+  let currentFilter = { from: null, to: null };
 
-
-    // Persistent storage
-    const STORAGE_KEY = 'office_expenses_entries_v2';
-    let entries = [];
-    let currentFilter = { from: null, to: null };
-
-    // Default today's date
+  // Default today's date in the form
+  document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('date');
-    dateInput.valueAsDate = new Date();
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec"; // replace with your real Web App URL
+    if (dateInput) dateInput.valueAsDate = new Date();
+  });
 
-async function loadEntries() {
-  try {
-    const res = await fetch(WEB_APP_URL);
-    const data = await res.json();
+  // Use your provided Web App URL (fallback if syncUrl input is empty)
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec";
 
-    if (Array.isArray(data)) {
-      entries = data.slice(1).map(row => ({
-        date: row[0],
-        type: row[1],
-        amount: row[2],
-        source: row[3],
-        note: row[4],
-        category: row[5],
-        method: row[6],
-        refId: row[7]
-      }));
-    } else if (data && Array.isArray(data.entries)) {
-      entries = data.entries;
-    } else {
-      entries = [];
+  async function loadEntries() {
+    try {
+      const res = await fetch(WEB_APP_URL);
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        entries = data.slice(1).map(row => ({
+          date: row[0],
+          type: row[1],
+          amount: row[2],
+          source: row[3],
+          note: row[4],
+          category: row[5],
+          method: row[6],
+          refId: row[7],
+          id: cryptoRandomId(),               // ensure edit works for loaded rows
+          createdAt: new Date().toISOString()
+        }));
+      } else if (data && Array.isArray(data.entries)) {
+        entries = data.entries;
+      } else {
+        entries = [];
+      }
+    } catch (err) {
+      console.error('Could not load from Google Sheets, falling back to localStorage', err);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      entries = raw ? JSON.parse(raw) : [];
     }
-  } catch (err) {
-    console.error('Could not load from Google Sheets, falling back to localStorage', err);
-    const raw = localStorage.getItem(STORAGE_KEY);
-    entries = raw ? JSON.parse(raw) : [];
+
+    // Show top 10 by default on page load
+    renderEntries(entries.slice(-10));
   }
 
-  renderEntries(entries.slice(0, 10));
-}
+  async function addEntry(entry) {
+    try {
+      await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      await loadEntries();
+    } catch (err) {
+      console.error('Could not save to Google Sheets, saving locally', err);
+      entries.push(entry);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      renderEntries(entries.slice(-10));
+    }
+  }
 
-async function addEntry(entry) {
-  try {
-    await fetch(WEB_APP_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entry)
-    });
-    await loadEntries();
-  } catch (err) {
-    console.error('Could not save to Google Sheets, saving locally', err);
+  function filterByDate(selectedDate) {
+    const filtered = entries.filter(e => e.date === selectedDate);
+    renderEntries(filtered);
+  }
+
+  function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+
+  function saveEntry() {
+    const type = document.getElementById('type').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const date = document.getElementById('date').value;
+    const source = document.getElementById('source').value.trim();
+    const note = document.getElementById('note').value.trim();
+    const category = document.getElementById('category').value;
+    const method = document.getElementById('method').value;
+    const refId = document.getElementById('refId').value.trim();
+
+    if (!type || !amount || amount <= 0 || !date || !source || !note) {
+      alert('Please fill all required fields with valid values.');
+      return;
+    }
+
+    const entry = {
+      id: cryptoRandomId(),
+      createdAt: new Date().toISOString(),
+      date,
+      type,
+      amount,
+      source,
+      note,
+      category,
+      method,
+      refId
+    };
+
+    // Local save and UI update
     entries.push(entry);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    renderEntries(entries.slice(0, 10));
-  }
-}
+    persist();
+    renderEntries(entries.slice(-10)); // show latest 10 by default
 
-function filterByDate(selectedDate) {
-  const filtered = entries.filter(e => e.date === selectedDate);
-  renderEntries(filtered);
-}
+    // Auto-sync: post flat object (use syncUrl if provided, else WEB_APP_URL)
+    const urlFromInput = document.getElementById('syncUrl')?.value.trim();
+    const url = urlFromInput || WEB_APP_URL;
 
-
-
-    function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
-
-    function saveEntry() {
-  // ... build entry object ...
-
-  entries.push(entry);
-  persist();
-  renderEntries(entries.slice(0, 10));
-
-  const url = document.getElementById('syncUrl').value.trim() || WEB_APP_URL;
-  if (url) {
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
+      body: JSON.stringify({
+        date: entry.date,
+        type: entry.type,
+        amount: entry.amount,
+        source: entry.source,
+        note: entry.note,
+        category: entry.category,
+        method: entry.method,
+        refId: entry.refId
+      })
     })
     .then(res => res.text()) // Apps Script returns "Success"
-    .then(data => console.log('Synced to Google Sheets:', data))
+    .then(() => {
+      console.log('Appended to Google Sheets');
+      // Optional: refresh from sheet
+      // loadEntries();
+    })
     .catch(err => console.error('Sync failed:', err));
+
+    resetForm();
   }
 
-  resetForm();
-}
+  function resetForm(){
+    document.getElementById('entryForm').reset();
+    document.getElementById('type').value = 'Credit';
+    document.getElementById('date').valueAsDate = new Date();
+  }
 
+  // Editing (no time limit)
+  function startEdit(id){
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
 
-    function resetForm(){
-      document.getElementById('entryForm').reset();
-      document.getElementById('type').value = 'Credit';
-      document.getElementById('date').valueAsDate = new Date();
+    // Render editable cells inline
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (!row) return;
+
+    row.innerHTML = `
+      <td>
+        <select id="edit_type_${id}">
+          <option ${entry.type==='Credit'?'selected':''}>Credit</option>
+          <option ${entry.type==='Debit'?'selected':''}>Debit</option>
+        </select>
+      </td>
+      <td class="right">
+        <input id="edit_amount_${id}" type="number" step="0.01" min="0" value="${entry.amount}">
+      </td>
+      <td><input id="edit_date_${id}" type="date" value="${entry.date}"></td>
+      <td><input id="edit_source_${id}" type="text" value="${escapeAttr(entry.source)}"></td>
+      <td><textarea id="edit_note_${id}">${escapeAttr(entry.note)}</textarea></td>
+      <td>
+        <select id="edit_category_${id}">
+          ${categoryOptions(entry.category)}
+        </select>
+      </td>
+      <td>
+        <select id="edit_method_${id}">
+          ${methodOptions(entry.method)}
+        </select>
+      </td>
+      <td><input id="edit_refId_${id}" type="text" value="${escapeAttr(entry.refId||'')}"></td>
+      <td>
+        <button class="btn btn-primary" onclick="saveEdit('${id}')">Save</button>
+        <button class="btn btn-outline" onclick="cancelEdit('${id}')">Cancel</button>
+      </td>
+    `;
+  }
+
+  function saveEdit(id){
+    const idx = entries.findIndex(e => e.id === id);
+    if (idx === -1) return;
+
+    const type = document.getElementById(`edit_type_${id}`).value;
+    const amount = parseFloat(document.getElementById(`edit_amount_${id}`).value);
+    const date = document.getElementById(`edit_date_${id}`).value;
+    const source = document.getElementById(`edit_source_${id}`).value.trim();
+    const note = document.getElementById(`edit_note_${id}`).value.trim();
+    const category = document.getElementById(`edit_category_${id}`).value;
+    const method = document.getElementById(`edit_method_${id}`).value;
+    const refId = document.getElementById(`edit_refId_${id}`).value.trim();
+
+    if (!type || !amount || amount <= 0 || !date || !source || !note) {
+      alert('Please fill all required fields with valid values.');
+      return;
     }
 
-    // Editing (no time limit)
-    function startEdit(id){
-      const entry = entries.find(e => e.id === id);
-      if (!entry) return;
+    entries[idx] = { ...entries[idx], type, amount, date, source, note, category, method, refId };
+    persist();
+    renderEntries();
+  }
 
-      // Render editable cells inline
-      const row = document.querySelector(`tr[data-id="${id}"]`);
-      if (!row) return;
+  function cancelEdit(id){ renderEntries(); }
 
-      row.innerHTML = `
-        <td>
-          <select id="edit_type_${id}">
-            <option ${entry.type==='Credit'?'selected':''}>Credit</option>
-            <option ${entry.type==='Debit'?'selected':''}>Debit</option>
-          </select>
-        </td>
-        <td class="right">
-          <input id="edit_amount_${id}" type="number" step="0.01" min="0" value="${entry.amount}">
-        </td>
-        <td><input id="edit_date_${id}" type="date" value="${entry.date}"></td>
-        <td><input id="edit_source_${id}" type="text" value="${escapeAttr(entry.source)}"></td>
-        <td><textarea id="edit_note_${id}">${escapeAttr(entry.note)}</textarea></td>
-        <td>
-          <select id="edit_category_${id}">
-            ${categoryOptions(entry.category)}
-          </select>
-        </td>
-        <td>
-          <select id="edit_method_${id}">
-            ${methodOptions(entry.method)}
-          </select>
-        </td>
-        <td><input id="edit_refId_${id}" type="text" value="${escapeAttr(entry.refId||'')}"></td>
-        <td>
-          <button class="btn btn-primary" onclick="saveEdit('${id}')">Save</button>
-          <button class="btn btn-outline" onclick="cancelEdit('${id}')">Cancel</button>
-        </td>
-      `;
-    }
+  function categoryOptions(selected){
+    const cats = ["", "Office Expenses", "Utilities", "Travel", "Maintenance", "Salary", "Miscellaneous"];
+    return cats.map(c => `<option ${c===selected?'selected':''}>${c}</option>`).join('');
+  }
+  function methodOptions(selected){
+    const methods = ["Cash","Bank Transfer","UPI","Card"];
+    return methods.map(m => `<option ${m===selected?'selected':''}>${m}</option>`).join('');
+  }
 
-    function saveEdit(id){
-      const idx = entries.findIndex(e => e.id === id);
-      if (idx === -1) return;
+  // Date filtering
+  function applyDateFilter(){
+    const from = document.getElementById('fromDate').value || null;
+    const to = document.getElementById('toDate').value || null;
+    currentFilter = { from, to };
+    renderEntries(); // will show ALL matches because filter is active
+  }
 
-      const type = document.getElementById(`edit_type_${id}`).value;
-      const amount = parseFloat(document.getElementById(`edit_amount_${id}`).value);
-      const date = document.getElementById(`edit_date_${id}`).value;
-      const source = document.getElementById(`edit_source_${id}`).value.trim();
-      const note = document.getElementById(`edit_note_${id}`).value.trim();
-      const category = document.getElementById(`edit_category_${id}`).value;
-      const method = document.getElementById(`edit_method_${id}`).value;
-      const refId = document.getElementById(`edit_refId_${id}`).value.trim();
-
-      if (!type || !amount || amount <= 0 || !date || !source || !note) {
-        alert('Please fill all required fields with valid values.');
-        return;
-      }
-
-      entries[idx] = { ...entries[idx], type, amount, date, source, note, category, method, refId };
-      persist();
-      renderEntries();
-    }
-
-    function cancelEdit(id){ renderEntries(); }
-
-    function categoryOptions(selected){
-      const cats = ["", "Office Expenses", "Utilities", "Travel", "Maintenance", "Salary", "Miscellaneous"];
-      return cats.map(c => `<option ${c===selected?'selected':''}>${c}</option>`).join('');
-    }
-    function methodOptions(selected){
-      const methods = ["Cash","Bank Transfer","UPI","Card"];
-      return methods.map(m => `<option ${m===selected?'selected':''}>${m}</option>`).join('');
-    }
-
-    // Date filtering
-function applyDateFilter(){
-  const from = document.getElementById('fromDate').value || null;
-  const to = document.getElementById('toDate').value || null;
-  currentFilter = { from, to };
-  renderEntries(); // will show ALL matches because filter is active
-}
-
-
-
-
-    function clearFilter(){
-  document.getElementById('fromDate').value = '';
-  document.getElementById('toDate').value = '';
-  currentFilter = { from: null, to: null };
-  renderEntries(); // back to last 10
-}
-
+  function clearFilter(){
+    document.getElementById('fromDate').value = '';
+    document.getElementById('toDate').value = '';
+    currentFilter = { from: null, to: null };
+    renderEntries(); // back to last 10
+  }
 
   function withinRange(dateStr){
-  if (!currentFilter.from && !currentFilter.to) return true;
-  const d = new Date(dateStr);
-  if (currentFilter.from && d < new Date(currentFilter.from)) return false;
-  if (currentFilter.to && d > new Date(currentFilter.to)) return false;
-  return true;
-}
+    if (!currentFilter.from && !currentFilter.to) return true;
+    const d = new Date(dateStr);
+    if (currentFilter.from && d < new Date(currentFilter.from)) return false;
+    if (currentFilter.to && d > new Date(currentFilter.to)) return false;
+    return true;
+  }
 
+  // Render table + totals (based on filter)
+  function renderEntries(list = entries){
+    const tbody = document.getElementById('entriesBody');
+    tbody.innerHTML = '';
 
-    // Render table + totals (based on filter)
-    function renderEntries(list = entries){
-  const tbody = document.getElementById('entriesBody');
-  tbody.innerHTML = '';
+    let sumCredit = 0, sumDebit = 0;
 
-  let sumCredit = 0, sumDebit = 0;
+    // Apply current filter
+    const filtered = list.filter(e => withinRange(e.date));
 
-  // Apply current filter
-  const filtered = list.filter(e => withinRange(e.date));
+    // Only limit to last 10 when NO filter is active
+    const isFilterActive = !!(currentFilter.from || currentFilter.to);
+    const toRender = isFilterActive ? filtered : filtered.slice(-10);
 
-  // Only limit to last 10 when NO filter is active
-  const isFilterActive = !!(currentFilter.from || currentFilter.to);
-  const toRender = isFilterActive ? filtered : filtered.slice(-10);
+    toRender.forEach(e => {
+      if (e.type === 'Credit') sumCredit += e.amount;
+      else sumDebit += e.amount;
 
-  toRender.forEach(e => {
-    if (e.type === 'Credit') sumCredit += e.amount;
-    else sumDebit += e.amount;
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', e.id);
+      const typeClass = e.type === 'Credit' ? 'credit' : 'debit';
 
-    const tr = document.createElement('tr');
-    tr.setAttribute('data-id', e.id);
-    const typeClass = e.type === 'Credit' ? 'credit' : 'debit';
+      tr.innerHTML = `
+        <td class="${typeClass}">${e.type}</td>
+        <td class="right ${typeClass}">₹${Number(e.amount).toFixed(2)}</td>
+        <td>${e.date}</td>
+        <td>${escapeHtml(e.source)}</td>
+        <td>${escapeHtml(e.note)}</td>
+        <td>${e.category ? `<span class="chip">${escapeHtml(e.category)}</span>` : ''}</td>
+        <td>${e.method ? `<span class="chip">${escapeHtml(e.method)}</span>` : ''}</td>
+        <td>${escapeHtml(e.refId || '')}</td>
+        <td><button class="btn btn-outline" onclick="startEdit('${e.id}')">Edit</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
 
-    tr.innerHTML = `
-      <td class="${typeClass}">${e.type}</td>
-      <td class="right ${typeClass}">₹${Number(e.amount).toFixed(2)}</td>
-      <td>${e.date}</td>
-      <td>${escapeHtml(e.source)}</td>
-      <td>${escapeHtml(e.note)}</td>
-      <td>${e.category ? `<span class="chip">${escapeHtml(e.category)}</span>` : ''}</td>
-      <td>${e.method ? `<span class="chip">${escapeHtml(e.method)}</span>` : ''}</td>
-      <td>${escapeHtml(e.refId || '')}</td>
-      <td><button class="btn btn-outline" onclick="startEdit('${e.id}')">Edit</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+    const netTotal = sumCredit - sumDebit;
+    document.getElementById('sumCredit').textContent = '₹' + sumCredit.toFixed(2);
+    document.getElementById('sumDebit').textContent = '₹' + sumDebit.toFixed(2);
+    document.getElementById('totalAmount').textContent = '₹' + netTotal.toFixed(2);
+  }
 
-  const netTotal = sumCredit - sumDebit;
-  document.getElementById('sumCredit').textContent = '₹' + sumCredit.toFixed(2);
-  document.getElementById('sumDebit').textContent = '₹' + sumDebit.toFixed(2);
-  document.getElementById('totalAmount').textContent = '₹' + netTotal.toFixed(2);
-}
+  // Print only Entries Preview (printArea)
+  function downloadPDF(){
+    window.print();
+  }
 
+  // Download Template CSV (required columns)
+  function downloadTemplate(){
+    const csv = [
+      'Type,Amount,Date,From,Note,Category,Method,RefID',
+      'Credit,1000,2025-11-01,ABC Traders,Advance received,Miscellaneous,Bank Transfer,ADV-001',
+      'Debit,250,2025-11-02,Stationery World,Pens and notebooks,Office Expenses,Cash,ST-783'
+    ].join('\n');
+    downloadBlob(csv, 'entry_format_template.csv', 'text/csv');
+  }
 
+  // Export all or filtered to CSV
+  function downloadExcel(){
+    const csv = buildCSV(entries);
+    downloadBlob(csv, 'office_expenses_all.csv', 'text/csv');
+  }
+  function downloadFilteredCSV(){
+    const filtered = entries.filter(e => withinRange(e.date));
+    const csv = buildCSV(filtered);
+    downloadBlob(csv, 'office_expenses_filtered.csv', 'text/csv');
+  }
 
-    // Print only Entries Preview (printArea)
-    function downloadPDF(){
-      window.print();
-    }
+  function buildCSV(list){
+    let csv = 'Type,Amount,Date,From,Note,Category,Method,RefID\n';
+    list.forEach(e => {
+      const row = [
+        e.type,
+        Number(e.amount).toFixed(2),
+        e.date,
+        sanitizeCSV(e.source),
+        sanitizeCSV(e.note),
+        e.category || '',
+        e.method || '',
+        e.refId || ''
+      ].join(',');
+      csv += row + '\n';
+    });
+    return csv;
+  }
 
-    // Download Template CSV (required columns)
-    function downloadTemplate(){
-      const csv = [
-        'Type,Amount,Date,From,Note,Category,Method,RefID',
-        'Credit,1000,2025-11-01,ABC Traders,Advance received,Miscellaneous,Bank Transfer,ADV-001',
-        'Debit,250,2025-11-02,Stationery World,Pens and notebooks,Office Expenses,Cash,ST-783'
-      ].join('\n');
-      downloadBlob(csv, 'entry_format_template.csv', 'text/csv');
-    }
+  // Import CSV according to template
+  function importCSV(){
+    const fileInput = document.getElementById('importFile');
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) { alert('Please choose a CSV file to import.'); return; }
 
-    // Export all or filtered to CSV
-    function downloadExcel(){
-      const csv = buildCSV(entries);
-      downloadBlob(csv, 'office_expenses_all.csv', 'text/csv');
-    }
-    function downloadFilteredCSV(){
-      const filtered = entries.filter(e => withinRange(e.date));
-      const csv = buildCSV(filtered);
-      downloadBlob(csv, 'office_expenses_filtered.csv', 'text/csv');
-    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target.result;
+      const rows = text.trim().split(/\r?\n/);
+      const header = rows.shift();
+      const expected = 'Type,Amount,Date,From,Note,Category,Method,RefID';
+      if (header.trim() !== expected){
+        alert('Invalid format. Please use the “Download Entry Format (CSV)” template.');
+        return;
+      }
+      let imported = 0;
+      rows.forEach(line => {
+        if (!line.trim()) return;
+        const cols = parseCSVLine(line);
+        const [type, amountStr, date, source, note, category, method, refId] = cols;
+        const amount = parseFloat(amountStr);
+        if (!type || !date || !source || !note || Number.isNaN(amount)) return;
 
-    function buildCSV(list){
-      let csv = 'Type,Amount,Date,From,Note,Category,Method,RefID\n';
-      list.forEach(e => {
-        const row = [
-          e.type,
-          Number(e.amount).toFixed(2),
-          e.date,
-          sanitizeCSV(e.source),
-          sanitizeCSV(e.note),
-          e.category || '',
-          e.method || '',
-          e.refId || ''
-        ].join(',');
-        csv += row + '\n';
-      });
-      return csv;
-    }
-
-    // Import CSV according to template
-    function importCSV(){
-      const fileInput = document.getElementById('importFile');
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) { alert('Please choose a CSV file to import.'); return; }
-
-      const reader = new FileReader();
-      reader.onload = e => {
-        const text = e.target.result;
-        const rows = text.trim().split(/\r?\n/);
-        const header = rows.shift();
-        const expected = 'Type,Amount,Date,From,Note,Category,Method,RefID';
-        if (header.trim() !== expected){
-          alert('Invalid format. Please use the “Download Entry Format (CSV)” template.');
-          return;
-        }
-        let imported = 0;
-        rows.forEach(line => {
-          if (!line.trim()) return;
-          const cols = parseCSVLine(line);
-          const [type, amountStr, date, source, note, category, method, refId] = cols;
-          const amount = parseFloat(amountStr);
-          if (!type || !date || !source || !note || Number.isNaN(amount)) return;
-
-          entries.push({
-            id: cryptoRandomId(),
-            type: type === 'Debit' ? 'Debit' : 'Credit',
-            amount,
-            date,
-            source,
-            note,
-            category: category || '',
-            method: method || '',
-            refId: refId || '',
-            createdAt: new Date().toISOString()
-          });
-          imported++;
+        entries.push({
+          id: cryptoRandomId(),
+          type: type === 'Debit' ? 'Debit' : 'Credit',
+          amount,
+          date,
+          source,
+          note,
+          category: category || '',
+          method: method || '',
+          refId: refId || '',
+          createdAt: new Date().toISOString()
         });
-        persist();
-        renderEntries();
-        alert(`Imported ${imported} entries.`);
-        fileInput.value = '';
-      };
-      reader.readAsText(file);
+        imported++;
+      });
+      persist();
+      renderEntries();
+      alert(`Imported ${imported} entries.`);
+      fileInput.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  // Google Sheets Sync (send all entries one-by-one as flat objects)
+  async function syncAll(){
+    const urlFromInput = document.getElementById('syncUrl').value.trim();
+    const url = urlFromInput || WEB_APP_URL;
+    if (!url){
+      alert('Please paste your Google Sheets Apps Script Web App URL.');
+      return;
     }
 
-    // Google Sheets Sync (requires webhook URL)
-    async function syncAll(){
-      const url = document.getElementById('syncUrl').value.trim();
-      if (!url){ alert('https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec'); return; }
-
-      const payload = { entries };
-      try{
-        const res = await fetch(url, {
+    try{
+      for (const e of entries) {
+        const payload = {
+          date: e.date,
+          type: e.type,
+          amount: e.amount,
+          source: e.source,
+          note: e.note,
+          category: e.category,
+          method: e.method,
+          refId: e.refId
+        };
+        await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json().catch(()=>({}));
-        alert('Sync completed successfully.');
-      }catch(err){
-        console.error(err);
-        alert('Sync failed. Please verify your Apps Script URL and permissions.');
       }
+      alert('Sync completed successfully.');
+    }catch(err){
+      console.error(err);
+      alert('Sync failed. Please verify your Apps Script URL and permissions.');
     }
+  }
 
-    // Helpers
-    function sanitizeCSV(s){ return String(s).replaceAll(',', ' '); }
-    function parseCSVLine(line){
-      // Simple CSV parser (no quoted commas). If you need full RFC parsing, replace this function.
-      return line.split(',').map(x => x.trim());
-    }
-    function downloadBlob(content, filename, mime){
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-    function escapeHtml(str){
-      if (!str) return '';
-      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
-    }
-    function escapeAttr(str){
-      if (!str) return '';
-      return String(str).replace(/"/g,'&quot;');
-    }
-    function cryptoRandomId(){
-      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-      return 'id-' + Math.random().toString(36).slice(2) + Date.now();
-    }
+  // Helpers
+  function sanitizeCSV(s){ return String(s).replaceAll(',', ' '); }
+  function parseCSVLine(line){
+    // Simple CSV parser (no quoted commas). If you need full RFC parsing, replace this function.
+    return line.split(',').map(x => x.trim());
+  }
+  function downloadBlob(content, filename, mime){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function escapeHtml(str){
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+  }
+  function escapeAttr(str){
+    if (!str) return '';
+    return String(str).replace(/"/g,'&quot;');
+  }
+  function cryptoRandomId(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-' + Math.random().toString(36).slice(2) + Date.now();
+  }
 
-    // Init
-    loadEntries();
+  // Init: load from Google Sheets and show latest 10
+  loadEntries();
 
   </script>
 </body>
 </html>
-
-
-
-
-
