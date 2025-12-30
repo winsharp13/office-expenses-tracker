@@ -318,58 +318,26 @@ function filterByDate(selectedDate) {
     function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
 
     function saveEntry() {
-  const type = document.getElementById('type').value;
-  const amount = parseFloat(document.getElementById('amount').value);
-  const date = document.getElementById('date').value;
-  const source = document.getElementById('source').value.trim();
-  const note = document.getElementById('note').value.trim();
-  const category = document.getElementById('category').value;
-  const method = document.getElementById('method').value;
-  const refId = document.getElementById('refId').value.trim();
+  // ... build entry object ...
 
-  if (!type || !amount || amount <= 0 || !date || !source || !note) {
-    alert('Please fill all required fields with valid values.');
-    return;
-  }
-
-  const id = cryptoRandomId();
-  const createdAt = new Date().toISOString();
-
-  // Build entry object with keys matching your Google Sheet columns
-  const entry = {
-    date,
-    type,
-    amount,
-    source,
-    note,
-    category,
-    method,
-    refId,
-    id,
-    createdAt
-  };
-
-  // Save locally
   entries.push(entry);
   persist();
-  renderEntries(entries.slice(0, 10)); // show top 10
+  renderEntries(entries.slice(0, 10));
 
-  // Auto-sync: send this single entry to Google Sheets
-  const url = document.getElementById('syncUrl').value.trim(); // your Web App URL
+  const url = document.getElementById('syncUrl').value.trim() || WEB_APP_URL;
   if (url) {
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry) // send flat object, not array
+      body: JSON.stringify(entry)
     })
-    .then(res => res.text()) // Apps Script returns plain "Success"
+    .then(res => res.text()) // Apps Script returns "Success"
     .then(data => console.log('Synced to Google Sheets:', data))
     .catch(err => console.error('Sync failed:', err));
   }
 
   resetForm();
 }
-
 
 
     function resetForm(){
@@ -617,7 +585,7 @@ function applyDateFilter(){
     // Google Sheets Sync (requires webhook URL)
     async function syncAll(){
       const url = document.getElementById('syncUrl').value.trim();
-      if (!url){ alert('Please paste your Google Sheets Apps Script Web App URL.'); return; }
+      if (!url){ alert('https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec'); return; }
 
       const payload = { entries };
       try{
@@ -669,6 +637,7 @@ function applyDateFilter(){
   </script>
 </body>
 </html>
+
 
 
 
