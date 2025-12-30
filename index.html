@@ -184,7 +184,7 @@ body {
       </div>
       <div class="card-body">
         <label for="syncUrl">Google Sheets Sync URL</label>
-        <input id="syncUrl" type="url" placeholder="Paste Apps Script Web App URL to sync entries" />
+        <input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/AKfycby2sZr5CPtXOhwbtbal1GuWgdbgnzWPkV-UaBoD3ByLHYMqZCB68ucEMxT_d9EyTfc/exec" />
         <div class="inline-actions">
           <button class="btn btn-outline" onclick="syncAll()">Sync All Entries</button>
           <span class="muted small">Your Sheet: https://docs.google.com/spreadsheets/d/1c0MQkm7l5iuHiA1Q9Wz_V_OKk538lRQmvZYFI3NYqQ8/edit?gid=0</span>
@@ -253,7 +253,7 @@ body {
   });
 
   // Use your provided Web App URL (fallback if syncUrl input is empty)
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwvP6HxhZCpVPu_uIPw76UMNAzXV5CGEIy2lb5mCiFxthOzUYepICriM6oZDldT7A/exec";
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby2sZr5CPtXOhwbtbal1GuWgdbgnzWPkV-UaBoD3ByLHYMqZCB68ucEMxT_d9EyTfc/exec";
 
   async function loadEntries() {
     try {
