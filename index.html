@@ -341,38 +341,33 @@ body {
     };
 
     // Local save and UI update
-    entries.push(entry);
-    persist();
-    renderEntries(entries.slice(-10)); // show latest 10 by default
+    // Save locally
+entries.push(entry);
+persist();
+renderEntries(entries.slice(-10));
 
-    // Auto-sync: post flat object (use syncUrl if provided, else WEB_APP_URL)
-    const urlFromInput = document.getElementById('syncUrl')?.value.trim();
-    const url = urlFromInput || WEB_APP_URL;
+// Send to Google Sheets
+const url = document.getElementById('syncUrl')?.value.trim() || WEB_APP_URL;
+fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    date: entry.date,
+    type: entry.type,
+    amount: entry.amount,
+    source: entry.source,
+    note: entry.note,
+    category: entry.category,
+    method: entry.method,
+    refId: entry.refId
+  })
+})
+.then(res => res.text())
+.then(data => console.log('Synced to Google Sheets:', data))
+.catch(err => console.error('Sync failed:', err));
 
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: entry.date,
-        type: entry.type,
-        amount: entry.amount,
-        source: entry.source,
-        note: entry.note,
-        category: entry.category,
-        method: entry.method,
-        refId: entry.refId
-      })
-    })
-    .then(res => res.text()) // Apps Script returns "Success"
-    .then(() => {
-      console.log('Appended to Google Sheets');
-      // Optional: refresh from sheet
-      // loadEntries();
-    })
-    .catch(err => console.error('Sync failed:', err));
+resetForm();
 
-    resetForm();
-  }
 
   function resetForm(){
     document.getElementById('entryForm').reset();
@@ -677,4 +672,5 @@ body {
   </script>
 </body>
 </html>
+
 
