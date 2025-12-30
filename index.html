@@ -289,20 +289,21 @@ body {
   }
 
   async function addEntry(entry) {
-    try {
-      await fetch(WEB_APP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry)
-      });
-      await loadEntries();
-    } catch (err) {
-      console.error('Could not save to Google Sheets, saving locally', err);
-      entries.push(entry);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-      renderEntries(entries.slice(-10));
-    }
+  try {
+    await fetch(WEB_APP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)   // flat object
+    });
+    await loadEntries();
+  } catch (err) {
+    console.error('Could not save to Google Sheets, saving locally', err);
+    entries.push(entry);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    renderEntries(entries.slice(-10));
   }
+}
+
 
   function filterByDate(selectedDate) {
     const filtered = entries.filter(e => e.date === selectedDate);
@@ -676,3 +677,4 @@ body {
   </script>
 </body>
 </html>
+
