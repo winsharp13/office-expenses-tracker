@@ -347,7 +347,7 @@ body {
     // Auto-sync: post flat object (use syncUrl if provided, else WEB_APP_URL)
     const urlFromInput = document.getElementById('syncUrl')?.value.trim();
     const url = urlFromInput || WEB_APP_URL;
-
+console.log("Sending to Sheets:", entry, url);
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -676,6 +676,7 @@ body {
   </script>
 </body>
 </html>
+
 
 
 
